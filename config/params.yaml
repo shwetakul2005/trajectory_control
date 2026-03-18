@@ -1,0 +1,17 @@
+trajectory_control_node:
+  ros__parameters:
+    # Waypoints in metres (x, y pairs)
+    # Modify these to change the robot's route
+    waypoints_x: [0.0, 0.5, 1.0, 1.5, 2.0, 2.5]
+    waypoints_y: [0.0, 0.5, 0.3, 0.9, 0.5, 0.0]
+
+    # Controller
+    lookahead_dist: 0.35   # metres
+    max_vel:        0.18   # m/s
+    max_omega:      2.0    # rad/s
+    control_hz:     20     # Hz
+
+    # Path
+    max_vel_traj:   0.20   # m/s
+    accel:          0.08   # m/s²
+    num_path_points: 400
