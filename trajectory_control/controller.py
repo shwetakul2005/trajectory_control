@@ -82,7 +82,8 @@ class PurePursuitController:
 
     def compute_velocity_commands(self,
                                   pose:            tuple[float, float, float],
-                                  lookahead_point: tuple[float, float]
+                                  lookahead_point: tuple[float, float],
+                                  ref_speed:       float = None
                                   ) -> tuple[float, float]:
         """
         Core Pure Pursuit formula.
@@ -93,6 +94,14 @@ class PurePursuitController:
         Args:
             pose            : (x, y, theta) current robot pose
             lookahead_point : (gx, gy) goal point in world frame
+            ref_speed       : desired linear speed from the trajectory
+                              velocity profile (m/s). When provided,
+                              this replaces the fixed max_vel so the
+                              robot honours the trapezoidal accel/decel
+                              profile computed in Task 2. Clamped to
+                              [0, max_vel] for safety.
+                              If None, falls back to max_vel (original
+                              behaviour, backwards-compatible).
 
         Returns:
             (v, omega) — linear (m/s) and angular (rad/s) velocity.
@@ -117,7 +126,13 @@ class PurePursuitController:
         # The lateral offset dy is the chord's perpendicular distance.
         curvature = 2.0 * dy / (dist ** 2)
 
-        v     = self.max_vel
+        # Use trajectory profile speed if supplied, else fall back to max_vel.
+        # Clamp to [0, max_vel] so a bad profile value can never exceed limits.
+        if ref_speed is not None:
+            v = max(0.0, min(self.max_vel, ref_speed))
+        else:
+            v = self.max_vel
+
         omega = v * curvature
 
         # Clamp to physical limits
