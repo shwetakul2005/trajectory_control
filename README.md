@@ -58,6 +58,12 @@ python3 plot_results.py
 ```
 This will open up a matplotlib window displaying the graphs and automatically save a `submission_plots.png` copy in your `~/trajectory_results` folder!
 
+### Results
+
+The following plots were generated from a live simulation run:
+
+![alt text](docs/submission_plots.png)
+
 ---
 
 ## 2.2. Design Choices, Algorithms, and Architectural Decisions
