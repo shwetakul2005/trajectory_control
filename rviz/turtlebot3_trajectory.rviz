@@ -53,19 +53,25 @@ Visualization Manager:
     - Class: rviz_default_plugins/Path
       Color: 0; 255; 0
       Enabled: true
+      Line Style: Lines
       Name: Smooth Path
+      Pose Style: None
       Topic: /smooth_path
       Value: true
     - Class: rviz_default_plugins/Path
       Color: 255; 165; 0
       Enabled: true
+      Line Style: Lines
       Name: Actual Path
+      Pose Style: None
       Topic: /actual_path
       Value: true
     - Class: rviz_default_plugins/Path
       Color: 0; 0; 255
       Enabled: true
+      Line Style: Lines
       Name: Trajectory
+      Pose Style: None
       Topic: /ref_trajectory
       Value: true
     - Class: rviz_default_plugins/MarkerArray
