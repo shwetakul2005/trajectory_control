@@ -13,7 +13,7 @@ This repository contains a ROS2 package `trajectory_control` that implements pat
   
   Install dependencies via pip:
   ```bash
-  pip3 install numpy scipy matplotlib
+  pip install -r requirements.txt
   ```
   Docker setup:
   ```bash
