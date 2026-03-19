@@ -59,12 +59,3 @@ def smooth_path(waypoints: list[tuple[float, float]],
     smooth_y  = spline_y(t_samples)
 
     return np.column_stack([smooth_x, smooth_y])
-    """
-    if __name__ == "__main__":
-    waypoints = [(0, 0), (1, 2), (3, 1), (4, 3)]
-
-    smooth = smooth_path(waypoints)
-
-    print("Smoothed points:")
-    print(smooth[:10])  # print first 10 points
-    """
