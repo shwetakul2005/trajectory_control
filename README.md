@@ -76,6 +76,7 @@ The project is built on a modular ROS2 node architecture:
 
 3. **Tracking Controller (Pure Pursuit):**
    A Pure Pursuit geometric controller is used to follow the trajectory. It dynamically looks for a "lookahead point" at a distance $L$ ahead of the robot. 
+   - **Velocity Profile Integration**: Instead of blindly commanding the maximum hardware velocity, the controller dynamically fetches the `ref_speed` from the exact time-parameterized trajectory point it is tracking. This ensures the robot physically honors the trapezoidal acceleration and deceleration curves generated in Task 2, guaranteeing exceptionally smooth real-world motion!
    - **Why Pure Pursuit over PID?** PID can suffer from integral wind-up on tight curves, whereas Pure Pursuit is highly robust geometrically, continuously curving the robot toward the target point without overshoot, provided $L$ is tuned correctly.
 
 ---
@@ -91,7 +92,22 @@ Extending this package from the `robot_simulator` to a physical robot is straigh
 
 ---
 
-## 2.4. AI Tools Used
+## 2.4. Unit Testing and Validation
+
+A comprehensive `pytest` testing suite is included under the `tests/` directory to rigorously validate each stage of the pipeline. To run the complete test suite locally, execute:
+```bash
+pytest tests/ -v
+```
+
+Here's what each file tests and why it matters:
+- **`test_path_smoother.py`** — Checks output shape, confirms that the curve starts/ends exactly at your waypoints, ensures that collinear points stay on a perfectly straight line, prevents NaN/Inf bounds, and mathematically proves that the model output is genuinely smoother than the raw input.
+- **`test_trajectory_generator.py`** — Verifies the trapezoidal profile logic: guarantees it starts slow, cleanly reaches cruise, ends slow, and never exceeds `max_vel`. Validates that timestamps are monotonically increasing from `0.0`, and that higher input speeds structurally result in shorter total duration times.
+- **`test_controller.py`** — Tests the Pure Pursuit geometry directly: asserts that a goal straight ahead means `omega = 0`, a left goal means `omega > 0`, and a right goal means `omega < 0`. It guarantees `omega` mathematically clamps to `max_omega`, and that symmetric goals give identically equal-magnitude turns. It also tests the CTE sign convention (left = positive, right = negative) and magnitude alignment to perpendicular distances.
+- **`test_integration.py`** — Runs a full noise-free unicycle simulation of the actual control loop. Verifies the robot actually reaches the goal on both a straight path and the S-curve from `params.yaml`, and asserts that the mean CTE strictly stays under 10 cm (straight) and 15 cm (S-curve). This is absolute geometric validation that the end-to-end tracking pipeline works perfectly together.
+
+---
+
+## 2.5. AI Tools Used
 
 AI-assisted programming tools (such as ChatGPT, GitHub Copilot, or similar LLMs) were utilized during this project for:
 - Structuring the ROS2 node boilerplates (`setup.py`, basic node lifecycle).
@@ -100,7 +116,7 @@ AI-assisted programming tools (such as ChatGPT, GitHub Copilot, or similar LLMs)
 
 ---
 
-## 2.5. Extending to Avoid Obstacles
+## 2.6. Extending to Avoid Obstacles
 
 The current implementation assumes a static, empty environment. To extend this system to avoid dynamic or unmapped obstacles:
 

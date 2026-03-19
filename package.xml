@@ -7,17 +7,16 @@
   <description>
     Path smoothing, trajectory generation and pure pursuit tracking
     controller for a differential drive robot in ROS2.
-    Tested on Turtlebot3 Burger in Gazebo.
   </description>
 
-  <maintainer email="you@example.com">Your Name</maintainer>
+  <maintainer email="[shwetakul2020@gmail.com]">Shweta Kulkarni</maintainer>
   <license>MIT</license>
 
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>std_msgs</depend>
-  <depend>turtlebot3_gazebo</depend>
+
 
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-scipy</exec_depend>
