@@ -9,7 +9,7 @@
     controller for a differential drive robot in ROS2.
   </description>
 
-  <maintainer email="[shwetakul2020@gmail.com]">Shweta Kulkarni</maintainer>
+  <maintainer email="shwetakul2020@gmail.com">Shweta Kulkarni</maintainer>
   <license>MIT</license>
 
   <depend>rclpy</depend>

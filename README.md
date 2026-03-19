@@ -15,6 +15,10 @@ This repository contains a ROS2 package `trajectory_control` that implements pat
   ```bash
   pip3 install numpy scipy matplotlib
   ```
+  Docker setup:
+  ```bash
+  docker run -p 6080:80 --shm-size=512m tiryoh/ros2-desktop-vnc:humble
+  ```
 
 ### Build the Package
 1. Create a ROS2 workspace (if you don't have one):
