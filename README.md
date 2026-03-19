@@ -44,10 +44,10 @@ ros2 launch trajectory_control turtlebot3_trajectory.launch.py
 
 This will:
 1. Start the `robot_simulator` node simulating the differential drive kinematics at 50Hz.
-2. Start the `trajectory_control_node` (delayed by 1s) which smooths the waypoints, generates the trajectory, and runs the 20Hz Pure Pursuit controller.
-3. Open RViz2 (delayed by 2s) to visualise the reference smooth path, trajectory, and the robot's actual path line.
+2. Start the `trajectory_control_node` (delayed by 1s) which smooths the waypoints (configured as an S-curve by default), generates the trajectory, and runs the 20Hz Pure Pursuit controller. The node automatically loads all ROS2 parameters from `config/params.yaml`.
+3. Open RViz2 (delayed by 2s). It will automatically load the pre-configured `rviz/turtlebot3_trajectory.rviz` workspace so you get zero-configuration, plug-and-play visualisation of the global paths, and live robot odometry.
 
-Once the robot reaches the final waypoint, the node will save logs (velocity, cross-track error) into a `results` folder.
+Once the robot reaches the final waypoint, the node will save logs (velocity, cross-track error, full simulated trajectory) firmly to `~/trajectory_results` on your filesystem so they are easy to locate and plot.
 
 ---
 
