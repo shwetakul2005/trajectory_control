@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
-import csv, os
+import csv, os, sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-import sys
-sys.path.insert(0, "/home/ubuntu/Desktop/ros2_ws/src/trajectory_control")
+
+# Automatically find the trajectory_control package directory
+PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PKG_DIR)
+
 from trajectory_control.path_smoother import smooth_path
 from trajectory_control.trajectory_generator import generate_trajectory
 
-RESULTS  = os.path.expanduser("~/Desktop/ros2_ws/results")
-WAYPOINTS = [(0.0,0.0),(1.0,1.0),(2.0,0.0),(3.0,-1.0),(4.0,0.0),(5.0,1.0),(6.0,0.0)]
+# Matching the logs directory we set perfectly in main_node.py
+RESULTS = os.path.expanduser("~/trajectory_results")
+
+# Default S-Curve waypoints matching your params.yaml
+WAYPOINTS = [(0.0, 0.0), (1.0, 1.0), (2.0, 0.0), (3.0, -1.0), (4.0, 0.0), (5.0, 1.0), (6.0, 0.0)]
 
 try:
-    cte = list(csv.reader(open(f"{RESULTS}/cte.csv")))
-    vel = list(csv.reader(open(f"{RESULTS}/velocity.csv")))
+    with open(f"{RESULTS}/cte.csv") as f: cte = list(csv.reader(f))
+    with open(f"{RESULTS}/velocity.csv") as f: vel = list(csv.reader(f))
 except FileNotFoundError as e:
-    print(f"ERROR: {e}"); exit(1)
+    print(f"ERROR: {e}\nPlease run the ROS2 simulation to generate logs first.")
+    sys.exit(1)
 
 # Regenerate full smooth path and trajectory from waypoints
 path = smooth_path(WAYPOINTS, num_points=400)
@@ -25,10 +32,11 @@ tx = [p.x for p in traj]
 ty = [p.y for p in traj]
 tt = [p.t for p in traj]
 tv = [p.v for p in traj]
-ct = [float(r[0]) for r in cte]
-ce = [float(r[1]) for r in cte]
-vt = [float(r[0]) for r in vel]
-vv = [float(r[1]) for r in vel]
+
+ct = [float(r[0]) for r in cte if r]
+ce = [float(r[1]) for r in cte if r]
+vt = [float(r[0]) for r in vel if r]
+vv = [float(r[1]) for r in vel if r]
 
 fig = plt.figure(figsize=(14, 10))
 fig.suptitle("Trajectory Control Results - Differential Drive Robot", fontsize=14)
@@ -40,9 +48,11 @@ wx = [p[0] for p in WAYPOINTS]
 wy = [p[1] for p in WAYPOINTS]
 ax1.plot(wx, wy, "o--", color="#378ADD", markersize=10,
          linewidth=1.5, label="Raw waypoints", zorder=3)
-for i,(x,y) in enumerate(WAYPOINTS):
+
+for i, (x, y) in enumerate(WAYPOINTS):
     ax1.text(x+0.05, y+0.08, str(i+1), fontsize=9,
              color="#378ADD", fontweight="bold")
+
 ax1.plot(tx, ty, "-", color="#1D9E75", linewidth=2.5,
          label="Smooth trajectory (cubic spline)", zorder=2)
 ax1.set_xlabel("x (m)"); ax1.set_ylabel("y (m)")
@@ -66,6 +76,7 @@ if ce:
     ax3.axhline(mean_cte, color="#888780", linestyle="--",
                 label=f"Mean = {mean_cte:.4f} m")
     print(f"Mean cross-track error: {mean_cte:.4f} m")
+
 ax3.set_xlabel("Time (s)"); ax3.set_ylabel("|CTE| (m)")
 ax3.set_title("Task 3: Cross-Track Error (Tracking Performance)")
 ax3.legend(fontsize=9); ax3.grid(alpha=0.3)

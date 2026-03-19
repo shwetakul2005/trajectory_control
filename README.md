@@ -49,6 +49,15 @@ This will:
 
 Once the robot reaches the final waypoint, the node will save logs (velocity, cross-track error, full simulated trajectory) firmly to `~/trajectory_results` on your filesystem so they are easy to locate and plot.
 
+### Viewing the Results (Plots and Graphs)
+The repository includes a graphing script that reads your logs from `~/trajectory_results` and visualizes the robot's performance, including its actual velocity vs target trapezoidal velocity, and cross-track error mapping:
+
+```bash
+cd ~/ros2_ws/src/trajectory_control/scripts
+python3 plot_results.py
+```
+This will open up a matplotlib window displaying the graphs and automatically save a `submission_plots.png` copy in your `~/trajectory_results` folder!
+
 ---
 
 ## 2.2. Design Choices, Algorithms, and Architectural Decisions
