@@ -163,7 +163,7 @@ class TrajectoryControlNode(Node):
 
         # Blend steer bias into omega when obstacle is near
         omega += steer_bias
-        omega = max(-self.max_omega, min(self.max_omega, omega))
+        omega = max(-self._ctrl.max_omega, min(self._ctrl.max_omega, omega))
         
         # Publish velocity command
         cmd           = Twist()
