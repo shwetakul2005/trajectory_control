@@ -15,6 +15,7 @@ from rclpy.node               import Node
 from geometry_msgs.msg        import Twist, PoseStamped
 from nav_msgs.msg             import Path, Odometry
 from std_msgs.msg             import Float32
+from visualization_msgs.msg   import Marker, MarkerArray
 
 from .path_smoother           import smooth_path
 from .trajectory_generator    import generate_trajectory, TrajectoryPoint
@@ -60,6 +61,7 @@ class TrajectoryControlNode(Node):
         self.actual_pub   = self.create_publisher(Path, '/actual_path', 10)
         self.ref_traj_pub = self.create_publisher(Path, '/ref_trajectory', 10)
         self.cte_pub      = self.create_publisher(Float32, '/cross_track_error', 10)
+        self.wp_marker_pub= self.create_publisher(MarkerArray, '/waypoints_marker', 10)
 
         # ── Subscriber ──────────────────────────────────────────────
         self.create_subscription(Odometry, '/odom', self._odom_callback, 10)
@@ -97,6 +99,7 @@ class TrajectoryControlNode(Node):
         # Publish reference paths once for RViz visualisation
         self._publish_smooth_path(path)
         self._publish_ref_trajectory()
+        self._publish_waypoints(waypoints)
 
         # ── Control loop (Task 3) ──────────────────────────────
         self.create_timer(1.0 / self.hz, self._control_loop)
@@ -191,6 +194,28 @@ class TrajectoryControlNode(Node):
             ps.pose.position.y = float(y)
             msg.poses.append(ps)
         return msg
+
+    def _publish_waypoints(self, waypoints: list) -> None:
+        msg = MarkerArray()
+        for i, (x, y) in enumerate(waypoints):
+            item = Marker()
+            item.header.frame_id = 'odom'
+            item.ns = 'waypoints'
+            item.id = i
+            item.type = Marker.CYLINDER
+            item.action = Marker.ADD
+            item.pose.position.x = float(x)
+            item.pose.position.y = float(y)
+            item.pose.position.z = 0.05
+            item.scale.x = 0.1
+            item.scale.y = 0.1
+            item.scale.z = 0.1
+            item.color.a = 1.0
+            item.color.r = 1.0
+            item.color.g = 1.0
+            item.color.b = 0.0
+            msg.markers.append(item)
+        self.wp_marker_pub.publish(msg)
 
     def _save_logs(self) -> None:
         log_dir = os.path.expanduser('~/trajectory_results')
