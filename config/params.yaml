@@ -15,3 +15,7 @@ trajectory_control_node:
     max_vel_traj:   0.20   # m/s
     accel:          0.08   # m/s²
     num_path_points: 400
+
+    # Obstacle Avoidance
+    obstacle_stop_dist:  0.30   # stop if obstacle within 30 cm
+    obstacle_steer_dist: 0.50   # steer away if within 50 cm

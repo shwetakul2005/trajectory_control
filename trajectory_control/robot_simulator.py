@@ -31,6 +31,7 @@ from rclpy.node                 import Node
 from geometry_msgs.msg          import Twist, TransformStamped
 from nav_msgs.msg               import Odometry
 from tf2_ros                    import TransformBroadcaster
+from sensor_msgs.msg            import LaserScan
 
 # Simulation parameters
 SIM_HZ        = 50.0           # physics update rate (Hz)
@@ -58,6 +59,7 @@ class RobotSimulator(Node):
         self._theta: float = 0.0
         self._v:     float = 0.0   # current linear velocity command
         self._omega: float = 0.0   # current angular velocity command
+        self._scan_pub = self.create_publisher(LaserScan, '/scan', 10)
 
         # ── Subscriber: receive velocity commands ─────────────────
         self.create_subscription(
@@ -112,6 +114,23 @@ class RobotSimulator(Node):
 
         # Publish odometry and TF
         self._publish_odom()
+        self._publish_fake_scan()
+    
+    def _publish_fake_scan(self) -> None:
+        """Publish a clear scan (no obstacles) for the controller to read.
+        In a real robot or Gazebo this comes from actual LiDAR hardware."""
+        msg = LaserScan()
+        msg.header.stamp    = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'base_scan'
+        msg.angle_min       = -3.14159
+        msg.angle_max       =  3.14159
+        msg.angle_increment =  0.01745   # ~1 degree
+        msg.range_min       =  0.12
+        msg.range_max       =  3.50
+        # All ranges at max = clear environment
+        num_readings = int((msg.angle_max - msg.angle_min) / msg.angle_increment)
+        msg.ranges = [msg.range_max] * num_readings
+        self._scan_pub.publish(msg)
 
     def _publish_odom(self) -> None:
         """

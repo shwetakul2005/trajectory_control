@@ -20,7 +20,7 @@ from visualization_msgs.msg   import Marker, MarkerArray
 from .path_smoother           import smooth_path
 from .trajectory_generator    import generate_trajectory, TrajectoryPoint
 from .controller              import PurePursuitController, CrossTrackErrorMonitor
-
+from sensor_msgs.msg          import LaserScan
 class TrajectoryControlNode(Node):
     """
     Main ROS2 node for trajectory tracking.
@@ -40,6 +40,12 @@ class TrajectoryControlNode(Node):
         self.declare_parameter('max_vel_traj', 0.20)
         self.declare_parameter('accel', 0.08)
         self.declare_parameter('num_path_points', 400)
+        self._scan_ranges: list = []
+        self.create_subscription(LaserScan, '/scan', self._scan_callback, 10)
+        self.declare_parameter('obstacle_stop_dist', 0.30)   # metres
+        self.declare_parameter('obstacle_steer_dist', 0.50)  # metres
+        self._stop_dist  = self.get_parameter('obstacle_stop_dist').value
+        self._steer_dist = self.get_parameter('obstacle_steer_dist').value
 
         # ── Retrieve Parameters ─────────────────────────────────────
         wx = self.get_parameter('waypoints_x').value
@@ -117,6 +123,13 @@ class TrajectoryControlNode(Node):
 
         self._pose = (p.x, p.y, yaw)
 
+    def _scan_callback(self, msg: LaserScan) -> None:
+        # Store valid ranges (filter out inf and 0.0)
+        self._scan_ranges = [
+            r for r in msg.ranges
+            if msg.range_min < r < msg.range_max
+        ]
+
     def _control_loop(self) -> None:
         if self._done:
             return
@@ -141,7 +154,17 @@ class TrajectoryControlNode(Node):
 
         ref_speed = self._traj[self._traj_idx].v
         v, omega = self._ctrl.compute_velocity_commands(self._pose, la_pt, ref_speed=ref_speed)
+        
+        should_stop, steer_bias = self._obstacle_check()
+        if should_stop:
+            self._stop_robot()
+            self.get_logger().warn('Obstacle detected — stopping.')
+            return
 
+        # Blend steer bias into omega when obstacle is near
+        omega += steer_bias
+        omega = max(-self.max_omega, min(self.max_omega, omega))
+        
         # Publish velocity command
         cmd           = Twist()
         cmd.linear.x  = float(v)
@@ -165,6 +188,36 @@ class TrajectoryControlNode(Node):
 
     def _stop_robot(self) -> None:
         self.cmd_pub.publish(Twist())
+
+    def _obstacle_check(self) -> tuple[bool, float]:
+        """
+        Check the laser scan for obstacles.
+
+        Returns:
+            (should_stop, steer_bias)
+            should_stop  : True if obstacle is within stop_dist
+            steer_bias   : positive = steer left, negative = steer right,
+                        0.0 = no obstacle in steer range
+        """
+        if not self._scan_ranges:
+            return False, 0.0
+
+        min_dist = min(self._scan_ranges)
+
+        if min_dist < self._stop_dist:
+            return True, 0.0
+
+        if min_dist < self._steer_dist:
+            n = len(self._scan_ranges)
+            mid = n // 2
+            # Compare left half vs right half to decide which way to steer
+            left_min  = min(self._scan_ranges[:mid])
+            right_min = min(self._scan_ranges[mid:])
+            # Steer away from the closer side
+            steer_bias = 0.3 if right_min < left_min else -0.3
+            return False, steer_bias
+
+        return False, 0.0
 
     def _mean_cte(self) -> float:
         if not self._cte_log:
