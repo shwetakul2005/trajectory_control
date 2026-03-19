@@ -139,7 +139,8 @@ class TrajectoryControlNode(Node):
         self._traj_idx, la_pt = self._ctrl.find_lookahead_point(
             self._pose, self._traj, self._traj_idx)
 
-        v, omega = self._ctrl.compute_velocity_commands(self._pose, la_pt)
+        ref_speed = self._traj[self._traj_idx].v
+v, omega = self._ctrl.compute_velocity_commands(self._pose, la_pt, ref_speed=ref_speed)
 
         # Publish velocity command
         cmd           = Twist()
