@@ -187,11 +187,14 @@ class TrajectoryControlNode(Node):
     def _make_path_msg(self, points: list) -> Path:
         msg = Path()
         msg.header.frame_id = 'odom'
+        msg.header.stamp = self.get_clock().now().to_msg()
         for (x, y) in points:
             ps = PoseStamped()
             ps.header.frame_id = 'odom'
+            ps.header.stamp = msg.header.stamp
             ps.pose.position.x = float(x)
             ps.pose.position.y = float(y)
+            ps.pose.orientation.w = 1.0  # Crucial: Without a valid quaternion, RViz refuses to draw the path line!
             msg.poses.append(ps)
         return msg
 
