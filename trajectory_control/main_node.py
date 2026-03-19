@@ -140,7 +140,7 @@ class TrajectoryControlNode(Node):
             self._pose, self._traj, self._traj_idx)
 
         ref_speed = self._traj[self._traj_idx].v
-v, omega = self._ctrl.compute_velocity_commands(self._pose, la_pt, ref_speed=ref_speed)
+        v, omega = self._ctrl.compute_velocity_commands(self._pose, la_pt, ref_speed=ref_speed)
 
         # Publish velocity command
         cmd           = Twist()
