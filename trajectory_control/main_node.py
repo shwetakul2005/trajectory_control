@@ -4,22 +4,6 @@ main_node.py
 ------------
 ROS2 node that ties all three pipeline stages together
 and controls the Turtlebot3 in Gazebo simulation.
-
-Pipeline:
-    WAYPOINTS
-        → path_smoother.smooth_path()         [Task 1]
-        → trajectory_generator.generate()     [Task 2]
-        → PurePursuitController (20 Hz loop)  [Task 3]
-        → /cmd_vel → Turtlebot3 moves
-
-Topics published:
-    /smooth_path      (nav_msgs/Path)    — reference smooth path for RViz
-    /actual_path      (nav_msgs/Path)    — robot's actual path for RViz
-    /ref_trajectory   (nav_msgs/Path)    — time-stamped trajectory for RViz
-    /cmd_vel          (geometry_msgs/Twist) — velocity commands to robot
-
-Topics subscribed:
-    /odom             (nav_msgs/Odometry)   — robot pose from simulation
 """
 
 import rclpy
@@ -36,61 +20,49 @@ from .path_smoother           import smooth_path
 from .trajectory_generator    import generate_trajectory, TrajectoryPoint
 from .controller              import PurePursuitController, CrossTrackErrorMonitor
 
-
-# ── Waypoints ─────────────────────────────────────────────────────
-# Modify these to change the robot's route.
-# Units: metres.  Origin (0,0) = robot starting position in Gazebo.
-WAYPOINTS = [
-    (0.0,  0.0),
-    (0.5,  0.5),
-    (1.0,  0.3),
-    (1.5,  0.9),
-    (2.0,  0.5),
-    (2.5,  0.0),
-]
-
-# ── Controller parameters ─────────────────────────────────────────
-LOOKAHEAD_DIST  = 0.35    # metres  — increase if oscillating
-MAX_VEL         = 0.18    # m/s     — Turtlebot3 Burger max = 0.22
-MAX_OMEGA       = 2.0     # rad/s
-CONTROL_HZ      = 20      # Hz — control loop frequency
-GOAL_TOLERANCE  = 0.12    # metres  — how close = "reached goal"
-
-# ── Path parameters ───────────────────────────────────────────────
-NUM_PATH_POINTS = 400     # spline sample resolution
-MAX_VEL_TRAJ    = 0.20    # m/s cruise speed for trajectory profile
-ACCEL           = 0.08    # m/s² acceleration
-
-
 class TrajectoryControlNode(Node):
     """
     Main ROS2 node for trajectory tracking.
-
-    Lifecycle:
-    1. __init__: build path and trajectory, set up pub/sub, start timer
-    2. odom_callback: update robot pose from /odom at ~30Hz
-    3. control_loop:  run controller at 20Hz, publish cmd_vel
-    4. On goal reached: stop robot, save logs, print summary
     """
 
     def __init__(self):
         super().__init__('trajectory_control_node')
 
+        # ── Declare Parameters ──────────────────────────────────────
+        self.declare_parameter('waypoints_x', [0.0, 0.5, 1.0, 1.5, 2.0, 2.5])
+        self.declare_parameter('waypoints_y', [0.0, 0.5, 0.3, 0.9, 0.5, 0.0])
+        self.declare_parameter('lookahead_dist', 0.35)
+        self.declare_parameter('max_vel', 0.18)
+        self.declare_parameter('max_omega', 2.0)
+        self.declare_parameter('control_hz', 20)
+        self.declare_parameter('goal_tolerance', 0.12)
+        self.declare_parameter('max_vel_traj', 0.20)
+        self.declare_parameter('accel', 0.08)
+        self.declare_parameter('num_path_points', 400)
+
+        # ── Retrieve Parameters ─────────────────────────────────────
+        wx = self.get_parameter('waypoints_x').value
+        wy = self.get_parameter('waypoints_y').value
+        
+        # Zip waypoints ensuring matching lengths
+        if len(wx) == len(wy) and len(wx) > 1:
+            waypoints = list(zip(wx, wy))
+        else:
+            self.get_logger().warn("Invalid waypoints in params. Using defaults.")
+            waypoints = [(0.0, 0.0), (0.5, 0.5), (1.0, 0.3), (1.5, 0.9), (2.0, 0.5), (2.5, 0.0)]
+        
+        self.hz = self.get_parameter('control_hz').value
+        self.goal_tol = self.get_parameter('goal_tolerance').value
+
         # ── Publishers ──────────────────────────────────────────────
-        self.cmd_pub      = self.create_publisher(
-            Twist,  '/cmd_vel',         10)
-        self.smooth_pub   = self.create_publisher(
-            Path,   '/smooth_path',     10)
-        self.actual_pub   = self.create_publisher(
-            Path,   '/actual_path',     10)
-        self.ref_traj_pub = self.create_publisher(
-            Path,   '/ref_trajectory',  10)
-        self.cte_pub      = self.create_publisher(
-            Float32, '/cross_track_error', 10)
+        self.cmd_pub      = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.smooth_pub   = self.create_publisher(Path, '/smooth_path', 10)
+        self.actual_pub   = self.create_publisher(Path, '/actual_path', 10)
+        self.ref_traj_pub = self.create_publisher(Path, '/ref_trajectory', 10)
+        self.cte_pub      = self.create_publisher(Float32, '/cross_track_error', 10)
 
         # ── Subscriber ──────────────────────────────────────────────
-        self.create_subscription(
-            Odometry, '/odom', self._odom_callback, 10)
+        self.create_subscription(Odometry, '/odom', self._odom_callback, 10)
 
         # ── Internal state ───────────────────────────────────────────
         self._pose:        tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -102,16 +74,19 @@ class TrajectoryControlNode(Node):
 
         # ── Build path and trajectory (Tasks 1 & 2) ─────────────────
         self.get_logger().info('Building smooth path...')
-        path           = smooth_path(WAYPOINTS, num_points=NUM_PATH_POINTS)
+        path = smooth_path(waypoints, num_points=self.get_parameter('num_path_points').value)
 
         self.get_logger().info('Generating trajectory...')
-        self._traj     = generate_trajectory(
-            path, max_vel=MAX_VEL_TRAJ, accel=ACCEL)
+        self._traj = generate_trajectory(
+            path, 
+            max_vel=self.get_parameter('max_vel_traj').value, 
+            accel=self.get_parameter('accel').value
+        )
 
-        self._ctrl     = PurePursuitController(
-            lookahead_dist=LOOKAHEAD_DIST,
-            max_vel=MAX_VEL,
-            max_omega=MAX_OMEGA,
+        self._ctrl = PurePursuitController(
+            lookahead_dist=self.get_parameter('lookahead_dist').value,
+            max_vel=self.get_parameter('max_vel').value,
+            max_omega=self.get_parameter('max_omega').value,
         )
 
         self.get_logger().info(
@@ -123,16 +98,12 @@ class TrajectoryControlNode(Node):
         self._publish_smooth_path(path)
         self._publish_ref_trajectory()
 
-        # ── 20 Hz control loop (Task 3) ──────────────────────────────
-        self.create_timer(1.0 / CONTROL_HZ, self._control_loop)
+        # ── Control loop (Task 3) ──────────────────────────────
+        self.create_timer(1.0 / self.hz, self._control_loop)
 
     # ── Callbacks ────────────────────────────────────────────────────
 
     def _odom_callback(self, msg: Odometry) -> None:
-        """
-        Extract (x, y, theta) from /odom message.
-        Converts quaternion orientation to yaw angle.
-        """
         p = msg.pose.pose.position
         q = msg.pose.pose.orientation
 
@@ -144,14 +115,6 @@ class TrajectoryControlNode(Node):
         self._pose = (p.x, p.y, yaw)
 
     def _control_loop(self) -> None:
-        """
-        Runs at 20 Hz. Core control cycle:
-        1. Check if goal is reached
-        2. Find lookahead point on trajectory
-        3. Compute velocity commands
-        4. Publish to /cmd_vel
-        5. Log CTE and actual path
-        """
         if self._done:
             return
 
@@ -160,14 +123,12 @@ class TrajectoryControlNode(Node):
             self._pose[0] - self._traj[-1].x,
             self._pose[1] - self._traj[-1].y,
         )
-        if self._traj_idx >= len(self._traj) - 1 \
-                or dist_to_goal < GOAL_TOLERANCE:
+        if self._traj_idx >= len(self._traj) - 1 or dist_to_goal < self.goal_tol:
             self._stop_robot()
             self._done = True
             self._save_logs()
             self.get_logger().info(
-                f'Goal reached! '
-                f'Mean CTE: {self._mean_cte():.4f} m'
+                f'Goal reached! Mean CTE: {self._mean_cte():.4f} m'
             )
             return
 
@@ -199,7 +160,6 @@ class TrajectoryControlNode(Node):
     # ── Helper methods ────────────────────────────────────────────────
 
     def _stop_robot(self) -> None:
-        """Publish zero velocity to stop the robot."""
         self.cmd_pub.publish(Twist())
 
     def _mean_cte(self) -> float:
@@ -222,37 +182,29 @@ class TrajectoryControlNode(Node):
         self.actual_pub.publish(msg)
 
     def _make_path_msg(self, points: list) -> Path:
-        """Utility: build a nav_msgs/Path from a list of (x,y) tuples."""
-        msg             = Path()
+        msg = Path()
         msg.header.frame_id = 'odom'
         for (x, y) in points:
-            ps                   = PoseStamped()
-            ps.header.frame_id   = 'odom'
-            ps.pose.position.x   = float(x)
-            ps.pose.position.y   = float(y)
+            ps = PoseStamped()
+            ps.header.frame_id = 'odom'
+            ps.pose.position.x = float(x)
+            ps.pose.position.y = float(y)
             msg.poses.append(ps)
         return msg
 
     def _save_logs(self) -> None:
-        """
-        Save CTE and trajectory data to CSV files.
-        These are read by plot_results.py to generate submission plots.
-        """
-        log_dir = os.path.join(
-            os.path.dirname(__file__), '..', 'results')
+        log_dir = os.path.expanduser('~/trajectory_results')
         os.makedirs(log_dir, exist_ok=True)
 
-        # CTE log: (time, cte)
+        # CTE log
         with open(os.path.join(log_dir, 'cte.csv'), 'w', newline='') as f:
             csv.writer(f).writerows(
-                [[round(i / CONTROL_HZ, 3), v]
-                 for i, v in enumerate(self._cte_log)])
+                [[round(i / self.hz, 3), v] for i, v in enumerate(self._cte_log)])
 
         # Velocity log
         with open(os.path.join(log_dir, 'velocity.csv'), 'w', newline='') as f:
             csv.writer(f).writerows(
-                [[round(i / CONTROL_HZ, 3), v]
-                 for i, v in enumerate(self._vel_log)])
+                [[round(i / self.hz, 3), v] for i, v in enumerate(self._vel_log)])
 
         # Full trajectory
         with open(os.path.join(log_dir, 'trajectory.csv'), 'w', newline='') as f:
@@ -261,10 +213,7 @@ class TrajectoryControlNode(Node):
             for i, p in enumerate(self._traj):
                 w.writerow([i, p.x, p.y, p.t, p.v])
 
-        self.get_logger().info(f'Logs saved to {log_dir}')
-
-
-# ── Entry point ───────────────────────────────────────────────────
+        self.get_logger().info(f'Logs successfully saved to {log_dir}')
 
 def main(args=None):
     rclpy.init(args=args)
@@ -276,3 +225,6 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
