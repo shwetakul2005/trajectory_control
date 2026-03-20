@@ -103,9 +103,15 @@ class TrajectoryControlNode(Node):
         )
 
         # Publish reference paths once for RViz visualisation
+        self._smooth_path_points = [(float(p[0]), float(p[1])) for p in path]
+        self._waypoints = waypoints
+
         self._publish_smooth_path(path)
         self._publish_ref_trajectory()
         self._publish_waypoints(waypoints)
+
+        # Re-publish every 0.5s so RViz never misses them
+        self.create_timer(0.5, self._republish_static_viz)
 
         # ── Control loop (Task 3) ──────────────────────────────
         self.create_timer(1.0 / self.hz, self._control_loop)
@@ -122,6 +128,12 @@ class TrajectoryControlNode(Node):
         yaw       = math.atan2(siny_cosp, cosy_cosp)
 
         self._pose = (p.x, p.y, yaw)
+
+    def _republish_static_viz(self) -> None:
+        if hasattr(self, '_smooth_path_points'):
+            self.smooth_pub.publish(self._make_path_msg(self._smooth_path_points))
+        self._publish_ref_trajectory()
+        self._publish_waypoints(self._waypoints)
 
     def _scan_callback(self, msg: LaserScan) -> None:
         # Store valid ranges (filter out inf and 0.0)
@@ -225,8 +237,8 @@ class TrajectoryControlNode(Node):
         return sum(self._cte_log) / len(self._cte_log)
 
     def _publish_smooth_path(self, path) -> None:
-        msg = self._make_path_msg(
-            [(float(p[0]), float(p[1])) for p in path])
+        self._smooth_path_points = [(float(p[0]), float(p[1])) for p in path]
+        msg = self._make_path_msg(self._smooth_path_points)
         self.smooth_pub.publish(msg)
 
     def _publish_ref_trajectory(self) -> None:
