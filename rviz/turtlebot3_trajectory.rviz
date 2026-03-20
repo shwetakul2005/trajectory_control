@@ -34,21 +34,21 @@ Visualization Manager:
       Color: 160; 160; 164
       Enabled: true
       Name: Grid
-    - Class: rviz_default_plugins/TF
+    - Class: rviz_default_plugins/Odometry
+      Covariance:
+        Orientation:
+          Color: 255; 255; 127
+          Radius: 0.1
       Enabled: true
-      Frame Timeout: 15
-      Frames:
-        All Enabled: false
-        base_footprint:
-          Value: true
-        odom:
-          Value: false
-      Marker Scale: 0.5
-      Name: Robot TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: false
-      Update Interval: 0
+      Keep: 100
+      Name: Odometry
+      Position Tolerance: 0.1
+      Shape:
+        Alpha: 1
+        Axes Length: 0.5
+        Axes Radius: 0.05
+        Radius: 0.1
+      Topic: /odom
       Value: true
     - Class: rviz_default_plugins/Path
       Color: 0; 255; 0
