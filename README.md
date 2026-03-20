@@ -107,7 +107,9 @@ Extending this package from the `robot_simulator` to a physical robot is straigh
 A comprehensive `pytest` testing suite is included under the `tests/` directory to rigorously validate each stage of the pipeline. To run the complete test suite locally, execute:
 ```bash
 cd ~/ros2_ws/src/trajectory_control
-python3 -m pytest tests/ -
+```
+```bash
+python3 -m pytest tests/ -v
 ```
 
 Here's what each file tests and why it matters:
